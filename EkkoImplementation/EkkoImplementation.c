@@ -9,7 +9,6 @@ void EkkoFunction(DWORD TIME_TO_SLEEP) {
 
 	CONTEXT RopProtRW = { 0 };
     CONTEXT RopMemEnc = { 0 };
-    CONTEXT RopDelay = { 0 };
     CONTEXT RopMemDec = { 0 };
     CONTEXT RopProtRX = { 0 };
     CONTEXT RopSetEvt = { 0 };
@@ -44,18 +43,20 @@ void EkkoFunction(DWORD TIME_TO_SLEEP) {
 
 	if (CreateTimerQueueTimer(&hTimer, hTimerQueue, RtlCaptureContext, &OriginalContext, 0, 0, WT_EXECUTEINTIMERTHREAD)) {
 		info("Context captured successfully");
-		//WaitForSingleObject(hEvent, TIME_TO_SLEEP);
+		Sleep(100); // Meant to let the stack stabalize
 
 		//Copying current context into multiple copies for different ROP chains
 		memcpy(&RopProtRW, &OriginalContext, sizeof(CONTEXT));
 		memcpy(&RopMemEnc, &OriginalContext, sizeof(CONTEXT));
-		memcpy(&RopDelay, &OriginalContext, sizeof(CONTEXT));
 		memcpy(&RopMemDec, &OriginalContext, sizeof(CONTEXT));
 		memcpy(&RopProtRX, &OriginalContext, sizeof(CONTEXT));
 		memcpy(&RopSetEvt, &OriginalContext, sizeof(CONTEXT));
 
+		// Rsp adjustments for stack alignment
+		// All threads end with ret and return to the rsp, hence in the current thread.
+
 		// VirtualProtect( ImageBase, ImageSize, PAGE_READWRITE, &OldProtect );
-		RopProtRW.Rsp -= 8;
+		RopProtRW.Rsp -= 24; // dangerous
 		RopProtRW.Rip = VirtualProtect;
 		RopProtRW.Rcx = ImageBase;
 		RopProtRW.Rdx = ImageSize;
@@ -63,45 +64,38 @@ void EkkoFunction(DWORD TIME_TO_SLEEP) {
 		RopProtRW.R9 = &OldProtect;
 
 		// SystemFunction032 (&Key, &Img);
-		RopMemEnc.Rsp -= 8;
+		RopMemEnc.Rsp -= 8; // safe
 		RopMemEnc.Rip = Sysfunc032;
-		RopMemEnc.Rcx = (DWORD64)&Key;
-		RopMemEnc.Rdx = (DWORD64)&Img;
+		RopMemEnc.Rcx = &Img;
+		RopMemEnc.Rdx = &Key;
 
-		// Sleep( TIME_TO_SLEEP );
-		RopDelay.Rsp -= 8;
-		RopDelay.Rip = WaitForSingleObject;
-		RopDelay.Rcx = NtCurrentProcess();
-		RopDelay.Rdx = TIME_TO_SLEEP;
 
 		// SystemFunction032 (&Key, &Img);
-		RopMemDec.Rsp -= 8;
+		RopMemDec.Rsp -= 24; // dangerous
 		RopMemDec.Rip = Sysfunc032;
-		RopMemDec.Rcx = (DWORD64)&Key;
-		RopMemDec.Rdx = (DWORD64)&Img;
+		RopMemDec.Rcx = &Img;
+		RopMemDec.Rdx = &Key;
 
 		// VirtualProtect( ImageBase, ImageSize, PAGE_EXECUTE_READ, &OldProtect );
-		RopProtRX.Rsp -= 8;
+		RopProtRX.Rsp -= 8; // safe
 		RopProtRX.Rip = VirtualProtect;
-		RopProtRX.Rcx = (DWORD64)ImageBase;
+		RopProtRX.Rcx = ImageBase;
 		RopProtRX.Rdx = ImageSize;
 		RopProtRX.R8 = PAGE_EXECUTE_READ;
-		RopProtRX.R9 = (DWORD64)&OldProtect;
+		RopProtRX.R9 = &OldProtect;
 
 		// SetEvent( hEvent );
-		RopSetEvt.Rsp -= 8;
+		RopSetEvt.Rsp -= 24; // dangerous
 		RopSetEvt.Rip = SetEvent;
-		RopSetEvt.Rcx = (DWORD64)hEvent;
+		RopSetEvt.Rcx = hEvent;
 
 		ok("Starting ROP chains via NtContinue...");
 
-		//CreateTimerQueueTimer(&hTimer, hTimerQueue, (WAITORTIMERCALLBACK)NtContinue, &RopDelay, 0, 0, WT_EXECUTEINTIMERTHREAD);
 		CreateTimerQueueTimer(&hTimer, hTimerQueue, (WAITORTIMERCALLBACK)NtContinue, &RopProtRW, 100, 0, WT_EXECUTEINTIMERTHREAD);
 		CreateTimerQueueTimer(&hTimer, hTimerQueue, (WAITORTIMERCALLBACK)NtContinue, &RopMemEnc, 200, 0, WT_EXECUTEINTIMERTHREAD);
-		CreateTimerQueueTimer(&hTimer, hTimerQueue, (WAITORTIMERCALLBACK)NtContinue, &RopDelay, 300, 0, WT_EXECUTEINTIMERTHREAD);
-		CreateTimerQueueTimer(&hTimer, hTimerQueue, (WAITORTIMERCALLBACK)NtContinue, &RopMemDec, 400, 0, WT_EXECUTEINTIMERTHREAD);
-		CreateTimerQueueTimer(&hTimer, hTimerQueue, (WAITORTIMERCALLBACK)NtContinue, &RopProtRX, 500, 0, WT_EXECUTEINTIMERTHREAD);
-		CreateTimerQueueTimer(&hTimer, hTimerQueue, (WAITORTIMERCALLBACK)NtContinue, &RopSetEvt, 600, 0, WT_EXECUTEINTIMERTHREAD);
+		CreateTimerQueueTimer(&hTimer, hTimerQueue, (WAITORTIMERCALLBACK)NtContinue, &RopMemDec, TIME_TO_SLEEP, 0, WT_EXECUTEINTIMERTHREAD);
+		CreateTimerQueueTimer(&hTimer, hTimerQueue, (WAITORTIMERCALLBACK)NtContinue, &RopProtRX, TIME_TO_SLEEP + 100, 0, WT_EXECUTEINTIMERTHREAD);
+		CreateTimerQueueTimer(&hTimer, hTimerQueue, (WAITORTIMERCALLBACK)NtContinue, &RopSetEvt, TIME_TO_SLEEP + 200, 0, WT_EXECUTEINTIMERTHREAD);
 
 		ok("ROP chains initiated successfully.");
 		ok("Waiting for hEvent");
@@ -119,6 +113,7 @@ void EkkoFunction(DWORD TIME_TO_SLEEP) {
 
 int main() {
 	do {
+		Sleep(5000);
 		EkkoFunction(4 * 1000);
 	} while (TRUE);
 	return 0;
