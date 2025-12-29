@@ -21,7 +21,7 @@ Ideally, this would go in a a loop where the EkkoSleep will replace sleep for th
 5. Make the whole image Read/Execute.
 6. Set the event object that the main thread is waiting for.
 
-![Ekko](./media/ekkoimpl.png)
+![Ekko](./media/ekko_impl.png)
 
 # Call Stack Spoofing (Static)
 
