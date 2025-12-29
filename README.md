@@ -49,3 +49,6 @@ Ideally, this would go in a a loop where the EkkoAndCSSSleep will replace sleep 
 6. Set the event object that the main thread is waiting for.
 
 ![CSS](./media/CSS_impl.png)
+
+# Comparison
+![comparison](./media/comparison.png)
