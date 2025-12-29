@@ -44,7 +44,7 @@ Ideally, this would go in a a loop where the EkkoAndCSSSleep will replace sleep 
 4. Spoof the call stack of the main thread.
 3. Sleep for whatever time.
 4. Decrypt the whole image.
-5. Restire the call stack of the main thread.
+5. Restore the call stack of the main thread.
 5. Make the whole image Read/Execute.
 6. Set the event object that the main thread is waiting for.
 
