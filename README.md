@@ -52,3 +52,15 @@ Ideally, this would go in a a loop where the EkkoAndCSSSleep will replace sleep 
 
 # Comparison
 ![comparison](./media/comparison.png)
+
+# Convert To Shellcode
+I converted the CallStackSpoofing binary to shellcode using [donut](https://github.com/TheWover/donut), the same can be done for Ekko too and in general, probably any binary where this is being implemented.<br>
+![donut](./media/donut.png)
+
+I used my own [MixLoader](https://github.com/JodisKripe/MixLoader) to encrypt the shellcode with a key and running the shellcode via a self injection through indirect syscalls and a callback function.<br>
+![MixLoader](./media/mixloader.png)
+The results were identical to how I was running the binary, only this time not only the shellcode got encrypted, the whole loader's image was getting encrypted during runtime and the stack was being spoofed properly throughout.
+
+# ToDo
+- [x] Test as shellcode(donut).
+- [ ] Add branch for execution with APCs
